@@ -73,22 +73,6 @@ function handleCommandLineOptions()
 }
 
 
-function flatten(dep)
-{
-    const { groupId, artifactId, children } = dep
-
-    return {
-        groupId,
-        artifactId,
-        children: Array.isArray(children) && children.length ?
-            children.map(
-                // extract
-                ({ groupId, artifactId}) =>({groupId, artifactId})
-            ) : [],
-    }
-}
-
-
 function edgeKey(name, kidName)
 {
     return name + "->" + kidName
