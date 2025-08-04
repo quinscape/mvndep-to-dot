@@ -125,7 +125,8 @@ function collectNodesAndEdges(nodes, edges, config, raw, level = 0)
         nodes.set(name, {
             id: node,
             name,
-            artifacts: matched ? [fullId] : []
+            artifacts: matched ? [fullId] : [],
+            module: level === 0
         })
     }
     else
@@ -167,9 +168,34 @@ function collectNodesAndEdges(nodes, edges, config, raw, level = 0)
 }
 
 
+function renderAttrs(attrs)
+{
+    let out = ""
+    let first = true
+    for (let name in attrs)
+    {
+        if (attrs.hasOwnProperty(name))
+        {
+            const value = attrs[name]
+            out += (first ? " " : ", ") + name + "=" + JSON.stringify(value)
+        }
+        first = false
+    }
+    return out
+}
+
+
 function generateNode(node)
 {
-    return `    ${node.id} [label="${node.name}", comment="${node.artifacts.join(", ")}"];`
+    const attrs = {
+        label: node.name,
+        comments: node.artifacts.join(", "),
+        shape: node.module ? "ellipse" : "box",
+        style: "filled",
+        fillcolor: node.module ? "#ddd" : "transparent"
+    }
+
+    return `    ${node.id} [${renderAttrs(attrs)}];`
 }
 
 
@@ -205,6 +231,7 @@ function main()
 
     const output = trimIndent(`
         digraph {
+        graph [pad="0.3"]
         ${ Array.from(nodes.values()).map( generateNode ).join("\n")}
         
         ${ Array.from(edges.values()).map( generateEdge ).join("\n")}         
