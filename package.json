@@ -1,0 +1,16 @@
+{
+    "name": "@quinscape/mvndep-to-dot",
+    "version": "0.0.1",
+    "main": "index.js",
+    "repository": "git@github.com:quinscape/mvndep-to-dot.git",
+    "author": "Sven Helmberger <sven.helmberger@dataciders.com>",
+    "license": "Apache-2.0",
+    "private": false,
+    "type": "module",
+    "bin": {
+        "mvndeps-to-dot" : "./index.js"
+    },
+    "dependencies": {
+        "yargs": "^18.0.0"
+    }
+}
