@@ -48,3 +48,9 @@ The object keys define the name of the bucket. The values are always and array o
 just a maven group id or a fully qualified maven artefact with group id and artifactid separated by a colon. 
 (Note: Without version!)
 
+After you have written/updated your bucket definition, you can specify its location with the `--buckets` (or `-b`) option.
+
+```shell
+npx @quinscape/mvndeps-to-dot -b buckets.json dependency.json
+```
+
