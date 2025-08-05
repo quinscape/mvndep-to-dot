@@ -13,6 +13,11 @@ function trim(s)
     return s.replace(/^\s+|\s+$/g, "");
 }
 
+const DEFAULT_CONFIG = {
+    graphAttributes: (ctx, attrs) => { return attrs },
+    nodeAttributes: (ctx, attrs) => { return attrs },
+    edgeAttributes: null,
+}
 
 function handleCommandLineOptions()
 {
@@ -29,6 +34,10 @@ function handleCommandLineOptions()
             alias: "o",
             describe: "Write DOT to file instead of printing it to stdout",
         })
+        .option("config", {
+            alias: "c",
+            describe: "location of a javascript config file to customize output",
+        })
         .option("shorten", {
             alias: "s",
             describe: "Shorten unmatched artifacts by using only the artifact id instead of the full qualified group and artifact id",
@@ -37,7 +46,7 @@ function handleCommandLineOptions()
         .help()
 
     const argv = Yargs.argv
-    const {inputs, buckets, output} = argv
+    const {inputs, buckets, output, config } = argv
     const cwd = process.cwd()
 
     let inputPaths
@@ -63,13 +72,20 @@ function handleCommandLineOptions()
 
     const bucketsPath = buckets && path.resolve(cwd, buckets)
     const outputPath = output && path.resolve(cwd, output)
+    return (
+        config ? import(config).then(mod => {
+            return mod.default
+        }) : Promise.resolve(DEFAULT_CONFIG)
+    ).then( cfg => {
+        return {
+            inputPaths,
+            outputPath,
+            bucketsPath,
+            config : cfg,
+            shorten: argv.shorten
+        }
+    })
 
-    return {
-        inputPaths,
-        outputPath,
-        bucketsPath,
-        shorten: argv.shorten
-    }
 }
 
 
@@ -88,15 +104,21 @@ function newNodeName()
  *
  * @param {Map<string,object>} nodes    map of nodes (name -> node object)
  * @param {Map<string,string[]>} edges  Map of edges ( edgeKey -> [from, to])
- * @param config        config
+ * @param ctx        config
  * @param raw           raw JSON
  * @param level         recursion level
  */
-function collectNodesAndEdges(nodes, edges, config, raw, level = 0)
+function collectNodesAndEdges(nodes, edges, ctx, raw, level = 0)
 {
-    const { bucketRules , shorten } = config
+    const { bucketRules , shorten } = ctx
 
     const matched = matchRule(raw, bucketRules)
+
+    if (matched && matched[0] === "!")
+    {
+        return null;
+    }
+
     const fullId = raw.groupId + ":" + raw.artifactId
     const name = matched || (shorten ? raw.artifactId : fullId)
 
@@ -132,8 +154,11 @@ function collectNodesAndEdges(nodes, edges, config, raw, level = 0)
             for (let i = 0; i < children.length; i++)
             {
                 const kid = children[i]
-                const kidNode = collectNodesAndEdges(nodes, edges, config, kid, level + 1)
-                kidNodes.push(kidNode)
+                const kidNode = collectNodesAndEdges(nodes, edges, ctx, kid, level + 1)
+                if (kidNode)
+                {
+                    kidNodes.push(kidNode)
+                }
             }
 
             for (let i = 0; i < kidNodes.length; i++)
@@ -152,7 +177,7 @@ function collectNodesAndEdges(nodes, edges, config, raw, level = 0)
 }
 
 
-function renderAttrs(attrs)
+function renderAttrs(ctx, attrs)
 {
     let out = ""
     let first = true
@@ -169,56 +194,81 @@ function renderAttrs(attrs)
 }
 
 
-function generateNode(node)
+function generateNode(ctx, node)
 {
-    const attrs = {
+    ctx.node = node
+    ctx.edge = null
+
+    const attrs = ctx.config.nodeAttributes(ctx, {
         label: node.name,
         comments: node.artifacts.join(", "),
         shape: node.module ? "ellipse" : "box",
         style: "filled",
         fillcolor: node.module ? "#ddd" : "transparent"
+    })
+
+    return `    ${node.id} [${renderAttrs(ctx, attrs)}];`
+}
+const NO_ATTRS = {}
+
+function generateEdge(ctx, edge)
+{
+    const [from, to] = edge
+    let attrs;
+    if (ctx.config.edgeAttributes)
+    {
+        ctx.node = null
+        ctx.edge = edge
+        attrs = ctx.config.edgeAttributes(ctx, from, to)
     }
-
-    return `    ${node.id} [${renderAttrs(attrs)}];`
+    else
+    {
+        attrs = NO_ATTRS;
+    }
+    const s = renderAttrs(ctx, attrs);
+    return `    ${ from } -> ${ to }${s ? "[ " + s + " ]" : ""};`
 }
 
 
-function generateEdge([from, to])
+async function main()
 {
-    return `    ${ from } -> ${ to };`
-}
-
-
-function main()
-{
-    const { inputPaths, bucketsPath, shorten, outputPath } = handleCommandLineOptions()
+    const { inputPaths, bucketsPath, shorten, outputPath, config} = await handleCommandLineOptions()
 
     const bucketRules = bucketsPath ? parseBucketRules(bucketsPath) : []
 
-    const config = {
-        shorten,
-        bucketRules
-    }
 
     const nodes = new Map()
     const edges = new Map()
 
+    const ctx = {
+        nodes,
+        edges,
+        bucketRules,
+        config,
+        shorten,
+        node : null,
+        edge: null
+    }
+
     inputPaths.forEach(
         p => {
             const raw = JSON.parse(fs.readFileSync(p, "utf-8"))
-
-            collectNodesAndEdges(nodes, edges, config, raw)
+            collectNodesAndEdges(nodes, edges, ctx, raw)
         }
     )
 
     //console.log({nodes, edges})
 
+    const attrs = config.graphAttributes(ctx, {
+        pad: "0.3"
+    })
+
     const output = trimIndent(`
         digraph {
-        graph [pad="0.3"]
-        ${ Array.from(nodes.values()).map( generateNode ).join("\n")}
+            graph [ ${renderAttrs(ctx, attrs)} ]
+        ${ Array.from(nodes.values()).map( node => generateNode(ctx,node) ).join("\n")}
         
-        ${ Array.from(edges.values()).map( generateEdge ).join("\n")}         
+        ${ Array.from(edges.values()).map( edge => generateEdge(ctx,edge) ).join("\n")}         
         }`
     )
 
@@ -234,4 +284,4 @@ function main()
     }
 
 }
-main()
+main().catch(e => console.error(e));

@@ -54,3 +54,25 @@ After you have written/updated your bucket definition, you can specify its locat
 npx @quinscape/mvndeps-to-dot -b buckets.json dependency.json
 ```
 
+## Customization
+
+DOT output can be customized with the ´--config´ / ´-c´ 
+
+```javascript
+const config = {
+    graphAttributes: (ctx, attrs) => {
+        attrs.bgcolor = "#f0f0f0"
+        return attrs
+    },
+    nodeAttributes:  (ctx, attrs) => {
+        attrs.fillcolor = "#f0f"
+        return attrs
+    },
+    edegeAttributes: (ctx, from, to) => {
+        return { 
+            color: "#f00"
+        }        
+    }
+}
+export default config;
+```
