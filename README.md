@@ -54,6 +54,11 @@ After you have written/updated your bucket definition, you can specify its locat
 npx @quinscape/mvndeps-to-dot -b buckets.json dependency.json
 ```
 
+## Excluding artifacts
+
+If you start the name of a bucket with `!` the bucket and all artifacts matching it will be ignored and not be included
+in the graph.
+
 ## Customization
 
 DOT output can be customized with the ´--config´ / ´-c´ 
