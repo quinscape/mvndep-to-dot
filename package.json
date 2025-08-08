@@ -1,6 +1,6 @@
 {
     "name": "@quinscape/mvndep-to-dot",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "main": "index.js",
     "repository": "git@github.com:quinscape/mvndep-to-dot.git",
     "author": "Sven Helmberger <sven.helmberger@dataciders.com>",
